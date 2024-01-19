@@ -1,0 +1,115 @@
+---
+title: "Proje Rapor : Onur Karaçam 210401024"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Q1 : Problem tanımı
+
+Honorad Studio, reklam ajansı olarak, New York'ta üç şubesine *(Lower Manhattan, Hell's Kitchen, Astoria)* sahip olan **Maven Roasters**'ın bize başvurması üzerine, tasarımlarıyla birlikte hazırlayacağımız dış mekan tabelası ve saat aralıklarına uygun düzenleyeceğimiz kampanyalar aracılığıyla az satan ürünlerin satışını artırarak müşteri portföyünü genişletmeyi amaçlıyoruz.
+
+# Q2 : Proje Amacı
+[Coffee Shop Sales](https://www.kaggle.com/datasets/ahmedabbas757/coffee-sales/data) adli Kaggle veri setini kullanarak iş problemini **her bir şubeye ve *SAAT* aralığına özel olarak belirlediğimiz en az ilgi gören ürünü, "_BAZI YILDIZLAR VARDIR; KEŞFEDİLMEYİ BEKLEYEN_"** sloganıyla birlikte **fazla ilgi duyan ürünlerin yanında konumlandırarak öne çıkarmayı ve "_5 YILDIZI TAMAMLA VE GÜNEŞİN BİZDEN OLSUN_" kampanyasıyla daimi müşteri kazanmayı amaçlıyoruz.** Bu sayede şans verilmeyen ürünlerimizi tanıtlamakla birlikte işletmenin müşteri kitlesini çeşitlendirmeyi, yeni müşteri segmentlerine ulaşmayı ve daha fazla satış yapmayı planlıyoruz.
+
+# Q3 : Veri seti keşifsel analizi
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Veri setini içeri aktarıyoruz.
+filename <- "Coffee Shop Sales.csv"
+
+# Veri setini bir data.frame olarak ithal ediyoruz.
+library(readr)
+data <- read_csv(filename)
+```
+
+Veri seti Kaggle web sitesinden indirilmiştir ve **readr::read_csv()** fonksiyonu kullanılarak **`r class(data)[[1]]`** tipinde bir değişkene ithal edilmiştir. Veri boyutları aşağıdaki gibidir :
+
+- **Satir sayisi : `r nrow(data)`**
+- **Sütun sayisi : `r ncol(data)`**
+
+Veri setinin ön görsellemesi aşağıda verilmiştir.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data
+```
+
+- Veri setini incelediğimizde, problem çözümü için kullanacağımız sütunlardan **transaction_date** sütununun *character* tipinde geldiğini ve bunun *POSIXct* tipine dönüştürülmesi gerektiğini görüyoruz.
+
+- Veri setimizdeki **NA Veri sayisi : `r sum(is.na(data))`** olduğundan verilerin temiz ve kayıpsız olduğunu görüyoruz.
+
+-  Reklam çalışmamızda tatlandırıcı **(Flavours)**, kahve çekirdekleri **(Coffee beans)**, paketli çikolotalar **(Packaged Chocolate)**  ve markanın ürünleri **(Branded)** dahil edilmeyeceğinden dolayı veri setimizden bu ürünleri sileceğiz.
+
+- Diğer sütunlardaki değişkenlere ihtiyaç duymayacağımızdan onları sileceğiz.
+    + transaction_id, store_id, product_id, product_category, product_type
+    
+
+- **unit_price** sütununa tasarım kısmında ihtiyacımız olacağı için tutuyoruz.     
+
+- Veri setimizdeki **transaction_time** sütununun *time* tipinde olması saat aralığı seçmemizde bize yardımcı olacak. 
+
+- Veri setimizde tüm şubelerin verileri iç içe bulunduğu ve her bir şube için farklı reklam stratejileri geliştireceğimiz için şubeleri ayrı ayrı *data.frame*'lere atayacağız.
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+data$transaction_date <- as.POSIXct(data$transaction_date, format = "%m/%d/%Y")
+
+data <- data %>%
+  filter(!(product_category %in% c("Flavours", "Coffee beans", "Branded", "Packaged Chocolate")))
+
+data <- select(data, -c(transaction_id, store_id, product_id,product_type))
+
+
+#farkli_deger_sayisi <- length(unique(data$store_location))
+#farkli_deger_sayisi
+
+
+Lower_Manhattan <- data %>% filter(store_location == "Lower Manhattan")
+Astoria <- data %>% filter(store_location == "Astoria")
+Hells_Kitchen <- data %>% filter(store_location == "Hell's Kitchen")
+
+```
+<hr style="border:2px solid gray">
+    
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(gridExtra)
+library(ggplot2)
+
+Lower_Manhattan_category_sales <- ggplot(data, aes(x = product_category, y = transaction_qty, fill = product_category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ürün Satışları - Tüm Şubeler", x = "Ürün Kategorisi", y = "Satış Miktarı") +
+  theme_minimal()
+
+Astoria_sales <- ggplot(Astoria, aes(x = product_detail, y = transaction_qty)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Ürün Satışları - Astoria", x = "Ürün Detayı (product_detail)", y = "Satış Miktarı") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 5))
+
+grid.arrange(Lower_Manhattan_category_sales, Astoria_sales, ncol = 1)
+
+alt_500 <- subset(Astoria, transaction_qty < 500)
+
+```
+   
+##### Yukarıdaki iki grafikte de görüldüğü üzere **Loose Tea** kategorisindeki ürünlerim diğer kategorideki ürünlere göre açık ara daha az tercih edildiğini görüyoruz. Reklamlarımızda insanları **Loose Tea** kategorisindeki ürünleri satın almasına teşfik etmemiz gerektiği çıkarımını yapıyoruz. Ancak **projemizin amacı gün içerisindeki saat aralıklarında yapılan satışlara göre az tercih edilen ürüne teşviği artırmak** olduğundan **Loose Tea** kategorisindeki ürünlerin reklamını **Maven Roastery**nin isteğine göre *farklı* bir projede yapacağız.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+toplam_satis_sayisi_Lower_Manhattan <- sum(Lower_Manhattan$transaction_qty)
+toplam_satis_sayisi_Astoria <- sum(Astoria$transaction_qty)
+toplam_satis_sayisi_Hells_Kitchen <- sum(Hells_Kitchen$transaction_qty)
+```
+
+<br> </br>
+
+#### **Şubelerin Tekel Verileri**
+Store Location   | Data of Days | Data of Times | Categories | Products | Total Sales
+:---:  |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+Lower Manhattan | `r length(unique(Lower_Manhattan$transaction_date))`| `r length(unique(Lower_Manhattan$transaction_time))`| `r length(unique(Lower_Manhattan$product_category))` | `r length(unique(Lower_Manhattan$product_detail))`| `r format(toplam_satis_sayisi_Lower_Manhattan, scientific = FALSE)`
+Astoria | `r length(unique(Astoria$transaction_date))`| `r length(unique(Astoria$transaction_time))`| `r length(unique(Astoria$product_category))` | `r length(unique(Astoria$product_detail))`| `r format(toplam_satis_sayisi_Astoria, scientific = FALSE)`
+Hell's Kitchen | `r length(unique(Hells_Kitchen$transaction_date))`| `r length(unique(Hells_Kitchen$transaction_time))`| `r length(unique(Hells_Kitchen$product_category))` | `r length(unique(Hells_Kitchen$product_detail))`| `r format(toplam_satis_sayisi_Hells_Kitchen, scientific = FALSE)`
