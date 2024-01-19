@@ -1,0 +1,13 @@
+---
+title: "Proje Rapor : Onur Karaçam 210401024"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Q1 : Problem tanımı
+
+Honorad Studio, reklam ajansı olarak, New York'ta üç şubesine *(Lower Manhattan, Hell's Kitchen, Astoria)* sahip olan **Maven Roasters**'ın bize başvurması üzerine, tasarımlarıyla birlikte hazırlayacağımız dış mekan tabelası ve saat aralıklarına uygun düzenleyeceğimiz kampanyalar aracılığıyla az satan ürünlerin satışını artırarak müşteri portföyünü genişletmeyi amaçlıyoruz.
+
+# Q2 : Proje Amacı
+[Coffee Shop Sales](https://www.kaggle.com/datasets/ahmedabbas757/coffee-sales/data) adli Kaggle veri setini kullanarak iş problemini **her bir şubeye ve *SAAT* aralığına özel olarak belirlediğimiz en az ilgi gören ürünü, "_BAZI YILDIZLAR VARDIR; KEŞFEDİLMEYİ BEKLEYEN_"** sloganıyla birlikte **fazla ilgi duyan ürünlerin yanında konumlandırarak öne çıkarmayı ve "_5 YILDIZI TAMAMLA VE GÜNEŞİN BİZDEN OLSUN_" kampanyasıyla daimi müşteri kazanmayı amaçlıyoruz.** Bu sayede şans verilmeyen ürünlerimizi tanıtlamakla birlikte işletmenin müşteri kitlesini çeşitlendirmeyi, yeni müşteri segmentlerine ulaşmayı ve daha fazla satış yapmayı planlıyoruz.
