@@ -1,0 +1,380 @@
+---
+title: "Proje Rapor : Onur Karaçam 210401024"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Q1 : Problem tanımı
+
+Honorad Studio, reklam ajansı olarak, New York'ta üç şubesine *(Lower Manhattan, Hell's Kitchen, Astoria)* sahip olan **Maven Roasters**'ın bize başvurması üzerine, tasarımlarıyla birlikte hazırlayacağımız dış mekan tabelası ve saat aralıklarına uygun düzenleyeceğimiz kampanyalar aracılığıyla az satan ürünlerin satışını artırarak müşteri portföyünü genişletmeyi amaçlıyoruz.
+
+# Q2 : Proje Amacı
+[Coffee Shop Sales](https://www.kaggle.com/datasets/ahmedabbas757/coffee-sales/data) adli Kaggle veri setini kullanarak iş problemini **her bir şubeye ve *SAAT* aralığına özel olarak belirlediğimiz en az ilgi gören ürünü, "_BAZI YILDIZLAR VARDIR; KEŞFEDİLMEYİ BEKLEYEN_"** sloganıyla birlikte **fazla ilgi duyan ürünlerin yanında konumlandırarak öne çıkarmayı ve "_5 YILDIZI TAMAMLA VE GÜNEŞİN BİZDEN OLSUN_" kampanyasıyla daimi müşteri kazanmayı amaçlıyoruz.** Bu sayede şans verilmeyen ürünlerimizi tanıtlamakla birlikte işletmenin müşteri kitlesini çeşitlendirmeyi, yeni müşteri segmentlerine ulaşmayı ve daha fazla satış yapmayı planlıyoruz.
+
+# Q3 : Veri seti keşifsel analizi
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Veri setini içeri aktarıyoruz.
+filename <- "Coffee Shop Sales.csv"
+
+# Veri setini bir data.frame olarak ithal ediyoruz.
+library(readr)
+data <- read_csv(filename)
+```
+
+Veri seti Kaggle web sitesinden indirilmiştir ve **readr::read_csv()** fonksiyonu kullanılarak **`r class(data)[[1]]`** tipinde bir değişkene ithal edilmiştir. Veri boyutları aşağıdaki gibidir :
+
+- **Satir sayisi : `r nrow(data)`**
+- **Sütun sayisi : `r ncol(data)`**
+
+Veri setinin ön görsellemesi aşağıda verilmiştir.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data
+```
+
+- Veri setini incelediğimizde, problem çözümü için kullanacağımız sütunlardan **transaction_date** sütununun *character* tipinde geldiğini ve bunun *POSIXct* tipine dönüştürülmesi gerektiğini görüyoruz.
+
+- Veri setimizdeki **NA Veri sayisi : `r sum(is.na(data))`** olduğundan verilerin temiz ve kayıpsız olduğunu görüyoruz.
+
+-  Reklam çalışmamızda tatlandırıcı **(Flavours)**, kahve çekirdekleri **(Coffee beans)**, paketli çikolotalar **(Packaged Chocolate)**  ve markanın ürünleri **(Branded)** dahil edilmeyeceğinden dolayı veri setimizden bu ürünleri sileceğiz.
+
+- Diğer sütunlardaki değişkenlere ihtiyaç duymayacağımızdan onları sileceğiz.
+    + transaction_id, store_id, product_id, product_category, product_type
+    
+
+- **unit_price** sütununa tasarım kısmında ihtiyacımız olacağı için tutuyoruz.     
+
+- Veri setimizdeki **transaction_time** sütununun *time* tipinde olması saat aralığı seçmemizde bize yardımcı olacak. 
+
+- Veri setimizde tüm şubelerin verileri iç içe bulunduğu ve her bir şube için farklı reklam stratejileri geliştireceğimiz için şubeleri ayrı ayrı *data.frame*'lere atayacağız.
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+data$transaction_date <- as.POSIXct(data$transaction_date, format = "%m/%d/%Y")
+
+data <- data %>%
+  filter(!(product_category %in% c("Flavours", "Coffee beans", "Branded", "Packaged Chocolate")))
+
+data <- select(data, -c(transaction_id, store_id, product_id,product_type))
+
+
+#farkli_deger_sayisi <- length(unique(data$store_location))
+#farkli_deger_sayisi
+
+
+Lower_Manhattan <- data %>% filter(store_location == "Lower Manhattan")
+Astoria <- data %>% filter(store_location == "Astoria")
+Hells_Kitchen <- data %>% filter(store_location == "Hell's Kitchen")
+
+```
+<hr style="border:2px solid gray">
+    
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(gridExtra)
+library(ggplot2)
+
+Lower_Manhattan_category_sales <- ggplot(data, aes(x = product_category, y = transaction_qty, fill = product_category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ürün Satışları - Tüm Şubeler", x = "Ürün Kategorisi", y = "Satış Miktarı") +
+  theme_minimal()
+
+Astoria_sales <- ggplot(Astoria, aes(x = product_detail, y = transaction_qty)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Ürün Satışları - Astoria", x = "Ürün Detayı (product_detail)", y = "Satış Miktarı") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 5))
+
+grid.arrange(Lower_Manhattan_category_sales, Astoria_sales, ncol = 1)
+
+alt_500 <- subset(Astoria, transaction_qty < 500)
+
+```
+   
+##### Yukarıdaki iki grafikte de görüldüğü üzere **Loose Tea** kategorisindeki ürünlerim diğer kategorideki ürünlere göre açık ara daha az tercih edildiğini görüyoruz. Reklamlarımızda insanları **Loose Tea** kategorisindeki ürünleri satın almasına teşfik etmemiz gerektiği çıkarımını yapıyoruz. Ancak **projemizin amacı gün içerisindeki saat aralıklarında yapılan satışlara göre az tercih edilen ürüne teşviği artırmak** olduğundan **Loose Tea** kategorisindeki ürünlerin reklamını **Maven Roastery**nin isteğine göre *farklı* bir projede yapacağız.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+toplam_satis_sayisi_Lower_Manhattan <- sum(Lower_Manhattan$transaction_qty)
+toplam_satis_sayisi_Astoria <- sum(Astoria$transaction_qty)
+toplam_satis_sayisi_Hells_Kitchen <- sum(Hells_Kitchen$transaction_qty)
+```
+
+<br> </br>
+
+#### **Şubelerin Tekel Verileri**
+Store Location   | Data of Days | Data of Times | Categories | Products | Total Sales
+:---:  |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+Lower Manhattan | `r length(unique(Lower_Manhattan$transaction_date))`| `r length(unique(Lower_Manhattan$transaction_time))`| `r length(unique(Lower_Manhattan$product_category))` | `r length(unique(Lower_Manhattan$product_detail))`| `r format(toplam_satis_sayisi_Lower_Manhattan, scientific = FALSE)`
+Astoria | `r length(unique(Astoria$transaction_date))`| `r length(unique(Astoria$transaction_time))`| `r length(unique(Astoria$product_category))` | `r length(unique(Astoria$product_detail))`| `r format(toplam_satis_sayisi_Astoria, scientific = FALSE)`
+Hell's Kitchen | `r length(unique(Hells_Kitchen$transaction_date))`| `r length(unique(Hells_Kitchen$transaction_time))`| `r length(unique(Hells_Kitchen$product_category))` | `r length(unique(Hells_Kitchen$product_detail))`| `r format(toplam_satis_sayisi_Hells_Kitchen, scientific = FALSE)`
+
+<hr style="border:2px solid gray">
+# Q4 : Veri seti ön işlemesi
+
+- Q3'teki değişiklere göre 
+    - **Satir sayisi : `r nrow(data)`**
+    - **Sütun sayisi : `r ncol(data)`**
+    
+    
+- Demomuzda yukarıda edindiğimiz verilere göre en çok satış yapan **Astoria** şubesinin 1 haftalık *(2023-01-01 - 2023-01-08)* verilerini ele alacağız ve üzerinde çalışacağız. Aşağıdaki tabloda **Astoria** şubesinin **1 Ocak 2023** tarihi ile **8 Ocak 2023** tarihleri arasında yapmış olduğu satışları görüyoruz.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+Astoria_Datas <- Astoria %>%
+  filter(format(transaction_date, "%Y-%m-%d") >= "2023-01-01" & format(transaction_date,, "%Y-%m-%d") <= "2023-01-08")
+
+toplam_satis_sayisi_Astoria <- sum(Astoria_Datas$transaction_qty)
+Astoria_Datas_Revenue <- sum(Astoria_Datas$unit_price)
+Astoria_Datas
+
+```
+#### **Astoria** şubesinin **2023-01-01 - 2023-01-08** tarihinde yapmış olduğu satışlar:
+Store Location | Data of Days | Data of Times | Categories | Products | Total Sales | Revenue
+:---:  |:---:|:---:|:---:|:---:|:---:|:---: |
+Astoria | `r length(unique(Astoria_Datas$transaction_date))`| `r length(unique(Astoria_Datas$transaction_time))`| `r length(unique(Astoria_Datas$product_category))` | `r length(unique(Astoria_Datas$product_detail))`| `r format(toplam_satis_sayisi_Astoria, scientific = FALSE)`| `r format(Astoria_Datas_Revenue, scientific = FALSE)`
+- Aşağıdaki grafikte örnek olarak aldığımız 2023-01-01 tarihinden saat 11:00:00 - 12:00:00 arasında yapılmış olan satışları görüyoruz.
+<br> </br>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+zaman_araligi1 <- Astoria %>%
+  filter(format(transaction_date, "%Y-%m-%d") == "2023-01-06") %>%
+  filter(format(transaction_time, "%H:%M:%S") >= "12:00:00" & format(transaction_time, "%H:%M:%S") <= "13:00:00")
+
+ggplot(zaman_araligi1, aes(x = product_category, y = transaction_qty, fill = product_category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ürün Satışları - Astoria", x = "Ürün Kategorisi (product_category)", y = "Satış Miktarı") +
+  theme_minimal()
+
+ggplot(zaman_araligi1, aes(x = product_detail, y = transaction_qty)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Ürün Satışları - Astoria", x = "Ürün Detayı (product_detail)", y = "Satış Miktarı") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+<hr style="border:2px solid gray">
+
+# Q5 : Veri mühendisliği 
+
+- Daha çok veriyle daha doğru sonuçlar elde edeceğimiz için **Astoria** şubesinde en çok satış yapılan günü bulup o veriler üzerinde ilk demomuzu gerçekleştireceğiz.
+
+#### Aşağıdaki tabloda **Astoria** şubesinin satışlarının en çok olduğu 10 günü görüyoruz.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(kableExtra)
+
+toplam_transaction_qty <- Astoria %>%
+  group_by(transaction_date) %>%
+  summarise(toplam_qty = sum(transaction_qty))
+
+toplam_transaction_qty_sirali <- toplam_transaction_qty %>%
+  arrange(desc(toplam_qty)) %>%
+  top_n(10)
+
+toplam_transaction_qty_sirali %>%
+  kable("html", escape = F) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "bordered", "cell_borders", "full_width"), 
+    position = "center"
+  ) %>%
+  column_spec(1, width = "10cm") %>%
+  column_spec(2, width = "10cm") %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(which.max(toplam_transaction_qty_sirali$toplam_qty) + 0, background = "lightgreen")
+
+```
+<br> </br>
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+zaman_araligi2 <- Astoria %>%
+  filter(format(transaction_date, "%Y-%m-%d") == "2023-06-24")
+
+toplam_satis_sayisi_Astoria <- sum(zaman_araligi2$transaction_qty)
+```
+
+
+### Aşağıdaki tabloda **Astoria** şubesinin **`r unique(zaman_araligi2$transaction_date)`** tarihindeki tüm verilerini görüyoruz.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+zaman_araligi2
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+zaman_araligi2_categoryes <- ggplot(zaman_araligi2, aes(x = product_category, y = transaction_qty, fill = product_category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ürün Satışları - Astoria - 2023-06-24", x = "Ürün Kategorisi (product_category)", y = "Satış Miktarı") +
+  theme_minimal()
+
+zaman_araligi2_sales <- ggplot(zaman_araligi2, aes(x = product_detail, y = transaction_qty)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Ürün Satışları - Astoria - 2023-06-24", x = "Ürün Detayı (product_detail)", y = "Satış Miktarı") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 5))
+
+grid.arrange(zaman_araligi2_categoryes, zaman_araligi2_sales, ncol = 1.5)
+```
+
+Store Location | Day | Data of Times | Categories | Products | Total Sales |
+:---:  |:---:|:---:|:---:|:---:|:---:|
+Astoria | `r unique(zaman_araligi2$transaction_date)` | `r length(unique(zaman_araligi2$transaction_time))`| `r length(unique(zaman_araligi2$product_category))` | `r length(unique(zaman_araligi2$product_detail))`| `r format(toplam_satis_sayisi_Astoria, scientific = FALSE)`| `r format(Astoria_Datas_Revenue, scientific = FALSE)`
+
+
+# Q6 : Veri analizi
+
+### Aşağıdaki tabloda **Astoria** şubesinde en çok satış yapılan gün olan **`r unique(zaman_araligi2$transaction_date)`** tarihinde en çok ve en az satan ürünleri görüyoruz.
+<br> </br>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+toplam_satislar <- zaman_araligi2 %>%
+  group_by(product_detail) %>%
+  summarise(toplam_qty = sum(transaction_qty)) %>%
+  arrange(desc(toplam_qty))
+
+# En çok satan 5 ürün
+en_cok_satanlar <- toplam_satislar %>% slice_head(n = 5)
+
+# En az satan 5 ürün
+en_az_satanlar <- toplam_satislar %>% slice_tail(n = 5)
+
+
+en_cok_az_satanlar <- bind_rows(
+  en_cok_satanlar %>% mutate(Tür = "En Çok Satanlar"),
+  en_az_satanlar %>% mutate(Tür = "En Az Satanlar")
+)
+
+en_cok_az_satanlar
+
+```
+<br>
+
+### Aşağıdaki tabloda **Astoria** şubesindeki 1 saatlik tüm saat aralıklarındaki toplam satışları görüyoruz.
+</br>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+saat_araligi <- function(data, start_hour, end_hour) {
+  data %>%
+    filter(format(transaction_time, "%H:%M:%S") >= start_hour & format(transaction_time, "%H:%M:%S") <= end_hour) %>%
+    summarise(toplam_qty = sum(transaction_qty))
+}
+toplam_satislar_07_08 <- saat_araligi(zaman_araligi2, "07:00:00" , "08:00:00"	)
+toplam_satislar_08_09 <- saat_araligi(zaman_araligi2, "08:00:00" , "09:00:00"	)
+toplam_satislar_09_10 <- saat_araligi(zaman_araligi2, "09:00:00" , "10:00:00"	)
+toplam_satislar_10_11 <- saat_araligi(zaman_araligi2, "10:00:00" , "11:00:00"	)
+toplam_satislar_11_12 <- saat_araligi(zaman_araligi2, "11:00:00" , "12:00:00"	)
+toplam_satislar_12_13 <- saat_araligi(zaman_araligi2, "12:00:00" , "13:00:00"	)
+toplam_satislar_13_14 <- saat_araligi(zaman_araligi2, "13:00:00" , "14:00:00"	)
+toplam_satislar_14_15 <- saat_araligi(zaman_araligi2, "14:00:00" , "15:00:00"	)
+toplam_satislar_15_16 <- saat_araligi(zaman_araligi2, "15:00:00" , "16:00:00"	)
+toplam_satislar_16_17 <- saat_araligi(zaman_araligi2, "16:00:00" , "17:00:00"	)
+toplam_satislar_17_18 <- saat_araligi(zaman_araligi2, "17:00:00" , "18:00:00"	)
+toplam_satislar_18_19 <- saat_araligi(zaman_araligi2, "18:00:00" , "19:00:00"	)
+toplam_satislar_19_20 <- saat_araligi(zaman_araligi2, "19:00:00" , "20:00:00"	)
+
+saat_arakliklari <- bind_rows(
+  toplam_satislar_07_08 %>% mutate(SaatAraligi = "07:00:00 - 08:00:00"),
+  toplam_satislar_08_09 %>% mutate(SaatAraligi = "08:00:00 - 09:00:00"),
+  toplam_satislar_09_10 %>% mutate(SaatAraligi = "09:00:00 - 10:00:00"),
+  toplam_satislar_10_11 %>% mutate(SaatAraligi = "10:00:00 - 11:00:00"),
+  toplam_satislar_11_12 %>% mutate(SaatAraligi = "11:00:00 - 12:00:00"),
+  toplam_satislar_12_13 %>% mutate(SaatAraligi = "12:00:00 - 13:00:00"),
+  toplam_satislar_13_14 %>% mutate(SaatAraligi = "13:00:00 - 14:00:00"),
+  toplam_satislar_14_15 %>% mutate(SaatAraligi = "14:00:00 - 15:00:00"),
+  toplam_satislar_15_16 %>% mutate(SaatAraligi = "15:00:00 - 16:00:00"),
+  toplam_satislar_16_17 %>% mutate(SaatAraligi = "16:00:00 - 17:00:00"),
+  toplam_satislar_17_18 %>% mutate(SaatAraligi = "17:00:00 - 18:00:00"),
+  toplam_satislar_18_19 %>% mutate(SaatAraligi = "18:00:00 - 19:00:00"),
+  toplam_satislar_19_20 %>% mutate(SaatAraligi = "19:00:00 - 20:00:00")) 
+  
+saat_arakliklari %>%
+  kable("html", escape = F) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "bordered", "cell_borders", "full_width"), 
+    position = "center"
+  ) %>%
+  column_spec(1, width = "10cm") %>%
+  column_spec(2, width = "10cm") %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(which.max(toplam_transaction_qty_sirali$toplam_qty) + 4, background = "lightgreen")
+```
+### Bu tabloya göre en çok satış yapılan saat aralığının **11:00:00 - 12:00:00** olduğunu görüyoruz. 
+
+<br>
+
+</br>
+
+
+### Aşağıdaki tabloda **Astoria** şubesinde **`r unique(zaman_araligi2$transaction_date)`** tarihinde **11:00:00 - 12:00:00** saat aralığında yapılan tüm işlemleri görüyoruz.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Belirli bir zaman aralığındaki veriyi seçme (örneğin 07:00:00 ile 08:00:00 arası)
+
+zaman_araligi_Astoria <- Astoria %>%
+  filter(format(transaction_date, "%Y-%m-%d") == "2023-06-24") %>%
+  filter(format(transaction_time, "%H:%M:%S") >= "11:00:00" & format(transaction_time, "%H:%M:%S") <= "12:00:00")
+
+zaman_araligi_Astoria
+```
+<br>
+
+</br>
+
+
+### Aşağıdaki tabloda **Astoria** şubesinde **`r unique(zaman_araligi2$transaction_date)`** tarihinde **11:00:00 - 12:00:00** saat aralığında **en çok** ve **en az** saat 6 ürünü görüyoruz.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+toplam_satislar2 <- zaman_araligi_Astoria %>%
+  group_by(product_detail) %>%
+  summarise(toplam_qty = sum(transaction_qty)) %>%
+  arrange(desc(toplam_qty))
+
+# En çok satan 5 ürün
+en_cok_satanlar2 <- toplam_satislar2 %>% slice_head(n = 3)
+
+# En az satan 5 ürün
+en_az_satanlar2 <- toplam_satislar2 %>% slice_tail(n = 3)
+
+
+en_cok_az_satanlar2 <- bind_rows(
+  en_cok_satanlar2 %>% mutate(Tür = "En Çok Satanlar"),
+  en_az_satanlar2 %>% mutate(Tür = "En Az Satanlar")
+)
+
+en_cok_az_satanlar2
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+filtrelenmis_veri <- zaman_araligi2 %>%
+  filter(product_detail == "Columbian Medium Roast Sm")
+
+tablo <- filtrelenmis_veri %>%
+  select(product_detail, unit_price) %>%
+  distinct() %>%
+  arrange(unit_price)
+
+filtrelenmis_veri2 <- zaman_araligi2 %>%
+  filter(product_detail == "Traditional Blend Chai Rg")
+
+tablo2 <- filtrelenmis_veri2 %>%
+  select(product_detail, unit_price) %>%
+  distinct() %>%
+  arrange(unit_price)
+
+son_urunler <- bind_rows(
+  tablo %>% mutate(Tür = "En Çok Satan"),
+  tablo2 %>% mutate(Tür = "En Az Satan")
+)
+
+son_urunler
+
+```
+
+
