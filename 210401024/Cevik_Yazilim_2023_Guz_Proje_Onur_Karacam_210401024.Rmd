@@ -1,0 +1,10 @@
+---
+title: "Proje Rapor : Onur Karaçam 210401024"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Q1 : Problem tanımı
+
+Honorad Studio, reklam ajansı olarak, New York'ta üç şubesine *(Lower Manhattan, Hell's Kitchen, Astoria)* sahip olan **Maven Roasters**'ın bize başvurması üzerine, tasarımlarıyla birlikte hazırlayacağımız dış mekan tabelası ve saat aralıklarına uygun düzenleyeceğimiz kampanyalar aracılığıyla az satan ürünlerin satışını artırarak müşteri portföyünü genişletmeyi amaçlıyoruz.
